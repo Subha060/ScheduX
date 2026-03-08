@@ -9,6 +9,13 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+# added this
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # to read .env file 
+
+
 
 from pathlib import Path
 import os
@@ -41,6 +48,7 @@ INSTALLED_APPS = [
     "tailwind",
     "tailwind_css",
     "jinja2",
+    'ai_engine',
 ]
 
 TAILWIND_APP_NAME = "tailwind_css"
@@ -135,3 +143,7 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# added this
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
