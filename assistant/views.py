@@ -6,7 +6,7 @@ from ai_engine.base import generate, clean_json
 from ai_engine.email_generator import draft_email
 from ai_engine.summarizer import summarize, extract_text
 from ai_engine.task_parser import parse_task
-from accounts.models import UserProfile
+from accounts.models import UserProfile, Task, Summary, AIChat, EmailDraft
 import uuid
 
 @csrf_exempt
@@ -32,58 +32,58 @@ def chat_api(request):
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
         ai_response = ""
 
-        if mode == 'Meeting Summary':
+        if mode == 'Meeting Assistant':
             fmt = params.get('format', 'bullets')
             length = params.get('length', 'medium')
             
-            if uploaded_file:
-                content = extract_text(uploaded_file)
-                ai_response = summarize(content, format=fmt, length=length, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            else:
-                ai_response = summarize(text, format=fmt, length=length, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            summaries = list(profile.summaries)
-            summaries.append({'text': text, 'summary': ai_response})
-            profile.summaries = summaries
-
-        elif mode == 'Meeting Notes':
-            from ai_engine.meeting_notes import structure_notes
-            if uploaded_file:
-                content = extract_text(uploaded_file)
-                ai_response = structure_notes(content, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            else:
-                ai_response = structure_notes(text, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            chats = list(profile.ai_chat)
-            chats.append({'request': f"Structure notes: {text[:50]}...", 'response': ai_response})
-            profile.ai_chat = chats
+            content = extract_text(uploaded_file) if uploaded_file else text
+            ai_response = summarize(content, format=fmt, length=length, api_key=profile.ai_api_key, model_name=profile.ai_model)
+            
+            Summary.objects.create(user=request.user, original_text=content[:5000], summary_text=ai_response)
 
         elif mode == 'task_parse':
             task_data = parse_task(text, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            task_data['id'] = str(uuid.uuid4())
-            task_data.setdefault('status', 'todo')
-            tasks = list(profile.tasks)
-            tasks.append(task_data)
-            profile.tasks = tasks
-            profile.save()
+            new_task = Task.objects.create(
+                user=request.user,
+                title=task_data.get('title', 'New parsed task'),
+                status='todo',
+                priority=task_data.get('priority', 'medium'),
+                description=task_data.get('description', ''),
+                due_date=task_data.get('due_date', ''),
+                due_time=task_data.get('due_time', '')
+            )
+            
+            task_data['id'] = str(new_task.task_id)
+            task_data['status'] = new_task.status
             return JsonResponse(task_data)
 
-        elif mode == 'event_parse':
-            # Simplified event parser using general generate for now
-            today_str = date.today().strftime('%Y-%m-%d')
-            prompt = f"Parse this into a calendar event JSON (title, date (YYYY-MM-DD), start_time (HH:MM), end_time (HH:MM)). Today is {today_str}. Input: {text}. Return ONLY JSON."
-            raw = generate(prompt, api_key=profile.ai_api_key, model_name=profile.ai_model).strip()
-            # Basic cleanup
-            if raw.startswith('```'):
-                raw = raw.split('\n', 1)[1].rsplit('\n', 1)[0].strip()
-            try:
-                event_data = json.loads(raw)
-            except:
-                event_data = {'title': text, 'date': today_str, 'start_time': '09:00', 'end_time': '10:00'}
+        elif mode == 'Calendar Event':
+            from accounts.models import CalendarEvent
+            from ai_engine.event_parser import parse_event
+            from datetime import date
             
-            chats = list(profile.ai_chat)
-            chats.append({'request': f"Parse event: {text}", 'response': json.dumps(event_data)})
-            profile.ai_chat = chats
-            profile.save()
-            return JsonResponse(event_data)
+            event_data = parse_event(text, api_key=profile.ai_api_key, model_name=profile.ai_model)
+            
+            # Persist to Calendar database natively
+            event_obj = CalendarEvent.objects.create(
+                user=request.user,
+                title=event_data.get('title', text),
+                date=event_data.get('date', date.today().strftime('%Y-%m-%d')),
+                start_time=event_data.get('start_time', '09:00'),
+                end_time=event_data.get('end_time', '10:00'),
+                description=event_data.get('description', '')
+            )
+            
+            # Inject generated ID to the frontend
+            event_data['id'] = event_obj.id
+
+            # Format a friendly conversational response
+            ai_response = f"I've added the event: **{event_obj.title}** on {event_obj.date}"
+            if event_obj.start_time:
+                ai_response += f" at {event_obj.start_time}"
+            AIChat.objects.create(user=request.user, request_text=text, response_text=ai_response)
+            return JsonResponse({'response': ai_response})
+
 
         elif mode == 'reply_draft':
             # Context-aware reply drafting
@@ -105,46 +105,55 @@ def chat_api(request):
             ai_response += f"{email_data.get('closing', 'Regards')},\n"
             ai_response += f"{email_data.get('signature', request.user.get_full_name())}"
             
-            drafts = list(profile.draft_email)
-            drafts.append(result)
-            profile.draft_email = drafts
+            EmailDraft.objects.create(
+                user=request.user,
+                tone=email_data.get('tone', tone),
+                subject=email_data.get('subject', ''),
+                greeting=email_data.get('greeting', ''),
+                body=body_text,
+                closing=email_data.get('closing', ''),
+                signature=email_data.get('signature', request.user.get_full_name())
+            )
 
         elif mode == 'Task Planner':
             task_data = parse_task(text, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            task_data['id'] = str(uuid.uuid4())
-            task_data.setdefault('status', 'todo')
-            ai_response = f"I've added the task: **{task_data['title']}**"
-            if task_data['due_date']:
-                ai_response += f" (Due: {task_data['due_date']})"
-            tasks = list(profile.tasks)
-            tasks.append(task_data)
-            profile.tasks = tasks
+            Task.objects.create(
+                user=request.user,
+                title=task_data.get('title', 'New planner task'),
+                status='todo',
+                priority=task_data.get('priority', 'medium'),
+                description=task_data.get('description', ''),
+                due_date=task_data.get('due_date', ''),
+                due_time=task_data.get('due_time', '')
+            )
+            ai_response = f"I've added the task: **{task_data.get('title')}**"
+            if task_data.get('due_date'):
+                ai_response += f" (Due: {task_data.get('due_date')})"
 
-        elif mode == 'goal_suggest':
-            prompt = f"Based on these tasks, suggest 3 concise daily goals for today. Tasks: {text}. Return ONLY a JSON list of strings."
-            raw = generate(prompt, json_mode=True, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            cleaned = clean_json(raw)
-            try:
-                goals = json.loads(cleaned)
-            except:
-                goals = ["Complete pending tasks", "Check email", "Plan next steps"]
-            return JsonResponse({'goals': goals})
 
-        elif mode == 'Daily Plan':
-            # For now, treat as general generate or specific prompt
-            prompt = f"Create a daily schedule based on this plan: {text}"
-            ai_response = generate(prompt, api_key=profile.ai_api_key, model_name=profile.ai_model)
-            # Maybe save to a daily_plan field if added later, for now just chat
+
+        # elif mode == 'goal_suggest':
+        #     prompt = f"Based on these tasks, suggest 3 concise daily goals for today. Tasks: {text}. Return ONLY a JSON list of strings."
+        #     raw = generate(prompt, json_mode=True, api_key=profile.ai_api_key, model_name=profile.ai_model)
+        #     cleaned = clean_json(raw)
+        #     try:
+        #         goals = json.loads(cleaned)
+        #     except:
+        #         goals = ["Complete pending tasks", "Check email", "Plan next steps"]
+        #     return JsonResponse({'goals': goals})
+
+        # elif mode == 'Daily Plan':
+        #     # For now, treat as general generate or specific prompt
+        #     prompt = f"Create a daily schedule based on this plan: {text}"
+        #     ai_response = generate(prompt, api_key=profile.ai_api_key, model_name=profile.ai_model)
+        #     # Maybe save to a daily_plan field if added later, for now just chat
         
         else:
             # General Chat
             ai_response = generate(text, api_key=profile.ai_api_key, model_name=profile.ai_model)
 
         # Save to chat history
-        chats = list(profile.ai_chat)
-        chats.append({'request': text, 'response': ai_response})
-        profile.ai_chat = chats
-        profile.save()
+        AIChat.objects.create(user=request.user, request_text=text, response_text=ai_response)
 
         return JsonResponse({'response': ai_response})
 
@@ -159,16 +168,16 @@ def delete_draft(request):
     try:
         data = json.loads(request.body)
         index = int(data.get('draft_index', -1))
-        profile, _ = UserProfile.objects.get_or_create(user=request.user)
-        drafts = list(profile.draft_email)
+        
+        # In a real app the frontend should send the draft ID.
+        # Here we mimic the index logic: drafts are shown reversed (newest first).
+        drafts = list(EmailDraft.objects.filter(user=request.user).order_by('created_at'))
         if 0 <= index < len(drafts):
-            # The index in the template is from the reversed list,
-            # so we need to reverse back to find the correct DB index.
             db_index = len(drafts) - 1 - index
-            drafts.pop(db_index)
-            profile.draft_email = drafts
-            profile.save()
-            return JsonResponse({'success': True, 'remaining': len(drafts)})
+            draft_to_delete = drafts[db_index]
+            draft_to_delete.delete()
+            return JsonResponse({'success': True, 'remaining': len(drafts) - 1})
+            
         return JsonResponse({'error': 'Invalid index'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -179,9 +188,7 @@ def delete_all_drafts(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST requests allowed'}, status=405)
     try:
-        profile, _ = UserProfile.objects.get_or_create(user=request.user)
-        profile.draft_email = []
-        profile.save()
+        EmailDraft.objects.filter(user=request.user).delete()
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

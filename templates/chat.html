@@ -3,210 +3,239 @@
   Chat Assistant - ScheduX
 {% endblock title %}
 {% block content %}
-  <div class="flex flex-col h-screen lg:h-screen overflow-hidden">
-    <!-- ── Top bar ── -->
-    <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0a0c12]/80 backdrop-blur-md flex-shrink-0">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
-          <svg class="w-4 h-4 text-white"
-               fill="none"
-               viewBox="0 0 24 24"
-               stroke="currentColor"
-               stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-base font-bold text-white leading-tight">Chat Assistant</h1>
-          <div class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-[11px] text-emerald-400 font-medium">Online · AI powered</span>
-          </div>
-        </div>
+  <div class="flex h-screen lg:h-screen overflow-hidden relative">
+    <!-- ── Chat History Sidebar ── -->
+    <div id="history-overlay"
+         class="absolute inset-0 bg-[#0a0c12]/50 backdrop-blur-sm z-40 hidden transition-opacity duration-300 opacity-0">
+    </div>
+    <div id="chat-history-sidebar"
+         class="w-64 border-r border-white/5 bg-[#0a0c12]/95 backdrop-blur-xl absolute inset-y-0 left-0 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col flex-shrink-0 shadow-2xl h-full">
+      <div class="p-4 border-b border-white/5 flex items-center justify-between">
+        <h2 class="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Chat History</h2>
       </div>
-      <div class="flex items-center gap-2">
-        <!-- Clear chat -->
-        <button id="clear-btn"
-                title="Clear conversation"
-                class="w-8 h-8 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
-          <svg class="w-4 h-4"
-               fill="none"
-               viewBox="0 0 24 24"
-               stroke="currentColor"
-               stroke-width="1.75">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+      <div class="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
+        {% for chat in recent_chats %}
+          <button class="history-item w-full text-left p-3 rounded-xl hover:bg-white/5 transition-all group flex flex-col gap-1 border border-transparent hover:border-white/5"
+                  data-index="{{ forloop.counter0 }}">
+            <p class="text-sm text-slate-300 truncate font-medium">{{ chat.request_text }}</p>
+            <p class="text-[10px] text-slate-500">{{ chat.created_at|date:"M d, g:i a" }}</p>
+          </button>
+        {% empty %}
+          <div class="p-4 text-center text-xs text-slate-600">No recent chats.</div>
+        {% endfor %}
       </div>
     </div>
-    <!-- ── Messages area ── -->
-    <div id="messages"
-         class="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 scrollbar-hide">
-      <!-- Welcome / empty state -->
-      <div id="welcome-state"
-           class="flex flex-col items-center justify-center h-full min-h-[300px] text-center py-12">
-        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-indigo-600/20 border border-purple-500/20 flex items-center justify-center mb-5 shadow-xl shadow-purple-500/10">
-          <svg class="w-8 h-8 text-purple-400"
-               fill="none"
-               viewBox="0 0 24 24"
-               stroke="currentColor"
-               stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-          </svg>
-        </div>
-        <h2 class="text-xl font-bold text-white mb-2">How can I help you today?</h2>
-        <p class="text-slate-500 text-sm max-w-sm mb-8">
-          Ask me to manage tasks, summarize meetings, draft emails, or plan your day.
-        </p>
-        <!-- Mode selector cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
-          <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all duration-200"
-                  data-mode="Meeting Notes"
-                  data-placeholder="I'll structure your notes into Summary, Action Items, and Decisions…"
-                  data-color="indigo">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg">📝</span>
-              <p class="text-sm font-semibold text-indigo-400">Meeting Notes</p>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">Structure raw notes & actions</p>
-          </button>
-          <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all duration-200"
-                  data-mode="Meeting Summary"
-                  data-placeholder="Paste your meeting notes and I'll summarize them for you…"
-                  data-color="purple">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg">🗒️</span>
-              <p class="text-sm font-semibold text-purple-400">Meeting Summary</p>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">Summarize my meeting notes</p>
-          </button>
-          <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all duration-200"
-                  data-mode="Task Planner"
-                  data-placeholder="Tell me what you need to do and I'll plan your tasks…"
-                  data-color="blue">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg">✅</span>
-              <p class="text-sm font-semibold text-blue-400">Task Planner</p>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">Plan my tasks for today</p>
-          </button>
-          <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all duration-200"
-                  data-mode="Email Draft"
-                  data-placeholder="Describe who you're writing to and why, and I'll draft the email…"
-                  data-color="emerald">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg">✉️</span>
-              <p class="text-sm font-semibold text-emerald-400">Email Draft</p>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">Write a professional email</p>
-          </button>
-          <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all duration-200"
-                  data-mode="Daily Plan"
-                  data-placeholder="Tell me your goals for today and I'll build your schedule…"
-                  data-color="amber">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-lg">📅</span>
-              <p class="text-sm font-semibold text-amber-400">Daily Plan</p>
-            </div>
-            <p class="text-xs text-slate-500 leading-relaxed">Create my schedule for today</p>
-          </button>
-        </div>
-        <div id="advanced-controls"
-             class="hidden mt-6 w-full max-w-lg p-4 rounded-2xl bg-white/3 border border-white/5 items-center justify-center gap-6">
-          <!-- Dynamic content will be injected here -->
-        </div>
-        <p class="text-[11px] text-slate-600 mt-4">Select a mode, then describe what you need ↓</p>
-      </div>
-      <!-- Message template rendered by JS -->
-    </div>
-    <!-- ── Typing indicator (hidden by default) ── -->
-    <div id="typing-indicator" class="hidden px-4 md:px-8 pb-2 flex-shrink-0">
-      <div class="flex items-end gap-3 max-w-2xl">
-        <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mb-1">
-          <svg class="w-3.5 h-3.5 text-white"
-               fill="currentColor"
-               viewBox="0 0 20 20">
-            <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-          </svg>
-        </div>
-        <div class="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-1"></span>
-            <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-2"></span>
-            <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-3"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="flex-shrink-0 px-4 md:px-8 py-4 border-t border-white/5 bg-[#0a0c12]/60 backdrop-blur-md">
-      <div class="max-w-4xl mx-auto">
-        <div id="input-box"
-             class="flex flex-col gap-2 bg-white/5 border border-white/8 rounded-2xl px-4 py-3 transition-all duration-300">
-          <div id="mode-badge"
-               class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border w-fit"></div>
-          <!-- File preview chip (shown when a file is attached) -->
-          <div id="file-chip"
-               class="hidden items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit text-[11px] text-purple-300">
-            <svg class="w-3.5 h-3.5 flex-shrink-0"
+    <!-- ── Main Chat Area ── -->
+    <div class="flex-1 flex flex-col h-full relative">
+      <!-- ── Top bar ── -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#0a0c12]/80 backdrop-blur-md flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <!-- History Toggle Button -->
+          <button id="history-toggle-btn"
+                  title="Toggle Chat History"
+                  class="w-8 h-8 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all z-10 mr-1">
+            <svg class="w-4 h-4"
                  fill="none"
                  viewBox="0 0 24 24"
                  stroke="currentColor"
                  stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span id="file-chip-name" class="max-w-[200px] truncate font-medium"></span>
-            <button id="file-remove-btn"
-                    class="ml-1 text-purple-400 hover:text-white transition-colors">
-              <svg class="w-3 h-3"
-                   fill="none"
-                   viewBox="0 0 24 24"
-                   stroke="currentColor"
-                   stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+          </button>
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/25">
+            <svg class="w-4 h-4 text-white"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-base font-bold text-white leading-tight">Chat Assistant</h1>
+            <div class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-[11px] text-emerald-400 font-medium">Online · AI powered</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- New chat -->
+          <button id="clear-btn"
+                  title="Start a new chat"
+                  class="px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-2 text-indigo-400 hover:text-white hover:bg-indigo-500/20 transition-all font-semibold text-xs">
+            <svg class="w-3.5 h-3.5"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Chat
+          </button>
+        </div>
+      </div>
+      <!-- ── Messages area ── -->
+      <div id="messages"
+           class="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 scrollbar-hide">
+        <!-- Welcome / empty state -->
+        <div id="welcome-state"
+             class="flex flex-col items-center justify-center h-full min-h-[300px] text-center py-12">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-indigo-600/20 border border-purple-500/20 flex items-center justify-center mb-5 shadow-xl shadow-purple-500/10">
+            <svg class="w-8 h-8 text-purple-400"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+            </svg>
+          </div>
+          <h2 class="text-xl font-bold text-white mb-2">How can I help you today?</h2>
+          <p class="text-slate-500 text-sm max-w-sm mb-8">
+            Ask me to manage tasks, summarize meetings, draft emails, or plan your day.
+          </p>
+          <!-- Mode selector cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+            <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all duration-200"
+                    data-mode="Meeting Assistant"
+                    data-placeholder="Paste your meeting notes or upload a file to summarize and structure them…"
+                    data-color="purple">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📝</span>
+                <p class="text-sm font-semibold text-purple-400">Meeting Assistant</p>
+              </div>
+              <p class="text-xs text-slate-500 leading-relaxed">Summarize and structure notes</p>
+            </button>
+            <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/5 transition-all duration-200"
+                    data-mode="Task Planner"
+                    data-placeholder="Tell me what you need to do and I'll plan your tasks…"
+                    data-color="blue">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">✅</span>
+                <p class="text-sm font-semibold text-blue-400">Task Planner</p>
+              </div>
+              <p class="text-xs text-slate-500 leading-relaxed">Plan my tasks for today</p>
+            </button>
+            <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all duration-200"
+                    data-mode="Email Draft"
+                    data-placeholder="Describe who you're writing to and why, and I'll draft the email…"
+                    data-color="emerald">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">✉️</span>
+                <p class="text-sm font-semibold text-emerald-400">Email Draft</p>
+              </div>
+              <p class="text-xs text-slate-500 leading-relaxed">Write a professional email</p>
+            </button>
+            <button class="mode-card text-left p-4 rounded-2xl bg-white/3 border border-white/5 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all duration-200"
+                    data-mode="Calendar Event"
+                    data-placeholder="Provide event details like title, date, and time, and I'll schedule it…"
+                    data-color="indigo">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-lg">📅</span>
+                <p class="text-sm font-semibold text-indigo-400">Calendar Event</p>
+              </div>
+              <p class="text-xs text-slate-500 leading-relaxed">Create a calendar event</p>
             </button>
           </div>
-          <div class="flex items-end gap-3">
-            <!-- Hidden file input -->
-            <input id="file-input"
-                   type="file"
-                   accept=".txt,.pdf,.doc,.docx,.md"
-                   class="hidden" />
-            <!-- Attach button — only visible in Meeting Summary mode -->
-            <button id="attach-btn"
-                    title="Attach meeting notes"
-                    class="hidden w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 items-center justify-center text-purple-400 hover:text-white hover:bg-purple-500/20 transition-all flex-shrink-0">
-              <svg class="w-4 h-4"
+          <div id="advanced-controls"
+               class="hidden mt-6 w-full max-w-lg p-4 rounded-2xl bg-white/3 border border-white/5 items-center justify-center gap-6">
+            <!-- Dynamic content will be injected here -->
+          </div>
+          <p class="text-[11px] text-slate-600 mt-4">Select a mode, then describe what you need ↓</p>
+        </div>
+        <!-- Message template rendered by JS -->
+      </div>
+      <!-- ── Typing indicator (hidden by default) ── -->
+      <div id="typing-indicator" class="hidden px-4 md:px-8 pb-2 flex-shrink-0">
+        <div class="flex items-end gap-3 max-w-2xl">
+          <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mb-1">
+            <svg class="w-3.5 h-3.5 text-white"
+                 fill="currentColor"
+                 viewBox="0 0 20 20">
+              <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+          </div>
+          <div class="bg-white/5 border border-white/8 rounded-2xl rounded-bl-sm px-4 py-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-1"></span>
+              <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-2"></span>
+              <span class="w-2 h-2 rounded-full bg-slate-400 animate-bounce dot-3"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex-shrink-0 px-4 md:px-8 py-4 border-t border-white/5 bg-[#0a0c12]/60 backdrop-blur-md">
+        <div class="max-w-4xl mx-auto">
+          <div id="input-box"
+               class="flex flex-col gap-2 bg-white/5 border border-white/8 rounded-2xl px-4 py-3 transition-all duration-300">
+            <div id="mode-badge"
+                 class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border w-fit">
+            </div>
+            <!-- File preview chip (shown when a file is attached) -->
+            <div id="file-chip"
+                 class="hidden items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit text-[11px] text-purple-300">
+              <svg class="w-3.5 h-3.5 flex-shrink-0"
                    fill="none"
                    viewBox="0 0 24 24"
                    stroke="currentColor"
-                   stroke-width="1.75">
+                   stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
               </svg>
-            </button>
-            <textarea id="chat-input"
-                      rows="1"
-                      placeholder="Select a mode above to start…"
-                      disabled
-                      class="flex-1 bg-transparent text-slate-200 placeholder-slate-600 text-sm resize-none outline-none max-h-36 scrollbar-hide leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
-                      style="min-height:24px"></textarea>
-            <button id="send-btn"
-                    class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:scale-100 disabled:shadow-none flex-shrink-0"
-                    disabled>
-              <svg class="w-4 h-4 translate-x-0.5"
-                   fill="none"
-                   viewBox="0 0 24 24"
-                   stroke="currentColor"
-                   stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-            </button>
+              <span id="file-chip-name" class="max-w-[200px] truncate font-medium"></span>
+              <button id="file-remove-btn"
+                      class="ml-1 text-purple-400 hover:text-white transition-colors">
+                <svg class="w-3 h-3"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="flex items-end gap-3">
+              <!-- Hidden file input -->
+              <input id="file-input"
+                     type="file"
+                     accept=".txt,.pdf,.doc,.docx,.md"
+                     class="hidden" />
+              <!-- Attach button — only visible in Meeting Summary mode -->
+              <button id="attach-btn"
+                      title="Attach meeting notes"
+                      class="hidden w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 items-center justify-center text-purple-400 hover:text-white hover:bg-purple-500/20 transition-all flex-shrink-0">
+                <svg class="w-4 h-4"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="1.75">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </button>
+              <textarea id="chat-input"
+                        rows="1"
+                        placeholder="Select a mode above to start…"
+                        disabled
+                        class="flex-1 bg-transparent text-slate-200 placeholder-slate-600 text-sm resize-none outline-none max-h-36 scrollbar-hide leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
+                        style="min-height:24px"></textarea>
+              <button id="send-btn"
+                      class="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:scale-100 disabled:shadow-none flex-shrink-0"
+                      disabled>
+                <svg class="w-4 h-4 translate-x-0.5"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
+            <p class="text-center text-[11px] text-slate-700 mt-2">AI can make mistakes. Always verify important information.</p>
           </div>
-          <p class="text-center text-[11px] text-slate-700 mt-2">AI can make mistakes. Always verify important information.</p>
         </div>
       </div>
     </div>
-    <style>
+  </div>
+  <style>
   .dot-1 { animation-delay: 0ms; }
   .dot-2 { animation-delay: 150ms; }
   .dot-3 { animation-delay: 300ms; }
@@ -225,8 +254,17 @@
     to   { opacity:1; transform:translateY(0); }
   }
   .msg-row { animation: msgIn 0.25s ease forwards; }
-    </style>
-    <script>
+  </style>
+  <script>
+window.chatHistory = [
+{% for chat in recent_chats %}
+  {
+    request: "{{ chat.request_text|escapejs }}",
+    response: "{{ chat.response_text|escapejs }}"
+  }{% if not forloop.last %},{% endif %}
+{% endfor %}
+];
+
 (function () {
   const messagesEl   = document.getElementById('messages');
   const welcomeEl    = document.getElementById('welcome-state');
@@ -384,7 +422,6 @@
     purple:  { badge: 'bg-purple-500/15 border-purple-500/30 text-purple-300' },
     blue:    { badge: 'bg-blue-500/15 border-blue-500/30 text-blue-300' },
     emerald: { badge: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' },
-    amber:   { badge: 'bg-amber-500/15 border-amber-500/30 text-amber-300' },
     indigo:  { badge: 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300' },
   };
 
@@ -392,7 +429,6 @@
     purple:  { border: 'rgba(168,85,247,0.6)',  bg: 'rgba(168,85,247,0.12)' },
     blue:    { border: 'rgba(59,130,246,0.6)',   bg: 'rgba(59,130,246,0.12)' },
     emerald: { border: 'rgba(16,185,129,0.6)',   bg: 'rgba(16,185,129,0.12)' },
-    amber:   { border: 'rgba(245,158,11,0.6)',   bg: 'rgba(245,158,11,0.12)' },
     indigo:  { border: 'rgba(99,102,241,0.6)',    bg: 'rgba(99,102,241,0.12)' },
   };
 
@@ -421,7 +457,7 @@
     badgeEl.className = `flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border w-fit ${modeColors[color].badge}`;
     badgeEl.textContent = '⚡ ' + mode;
 
-    if (mode === 'Meeting Summary' || mode === 'Meeting Notes') {
+    if (mode === 'Meeting Assistant') {
       attachBtn.classList.remove('hidden');
       attachBtn.classList.add('flex');
     } else {
@@ -442,7 +478,7 @@
     const container = document.getElementById('advanced-controls');
     container.innerHTML = '';
     
-    if (mode === 'Meeting Summary') {
+    if (mode === 'Meeting Assistant') {
         container.classList.replace('hidden', 'flex');
         container.innerHTML = `
             <div class="flex flex-col gap-1.5">
@@ -540,6 +576,49 @@
     }
   });
   sendBtn.addEventListener('click', sendMessage);
+
+  /* ─── History item click ─── */
+  document.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', () => {
+          // Clear current chat display and set welcome to hidden
+          clearBtn.click();
+          setWelcome(false);
+          
+          const idx = parseInt(item.getAttribute('data-index'), 10);
+          const uText = window.chatHistory[idx].request;
+          const aText = window.chatHistory[idx].response;
+          
+          // inject past context directly
+          const row1 = renderMessage('user', uText, "Past");
+          messagesEl.appendChild(row1);
+          const row2 = renderMessage('ai', aText, "Past");
+          messagesEl.appendChild(row2);
+          
+          scrollBottom();
+      });
+  });
+
+  /* ─── History Sidebar Toggle ─── */
+  const historySidebar = document.getElementById('chat-history-sidebar');
+  const historyToggleBtn = document.getElementById('history-toggle-btn');
+  const historyOverlay = document.getElementById('history-overlay');
+
+  function toggleHistory() {
+      const isClosed = historySidebar.classList.contains('-translate-x-full');
+      if (isClosed) {
+          historySidebar.classList.remove('-translate-x-full');
+          historyOverlay.classList.remove('hidden');
+          // small delay to allow display:block to apply before animating opacity
+          setTimeout(() => historyOverlay.classList.remove('opacity-0'), 10);
+      } else {
+          historySidebar.classList.add('-translate-x-full');
+          historyOverlay.classList.add('opacity-0');
+          setTimeout(() => historyOverlay.classList.add('hidden'), 300);
+      }
+  }
+
+  historyToggleBtn.addEventListener('click', toggleHistory);
+  historyOverlay.addEventListener('click', toggleHistory);
 })();
-    </script>
-  {% endblock content %}
+  </script>
+{% endblock content %}

@@ -4,96 +4,67 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
-from accounts.models import UserProfile
+from accounts.models import UserProfile, DailyGoal, TimeBlock, CurrentFocus
 
 @login_required
-def tasks(request):
-    try:
-        profile, _ = UserProfile.objects.get_or_create(user=request.user)
-        user_tasks = list(profile.tasks)
-    except Exception:
-        user_tasks = []
+def planner_view(request):
+    goals = DailyGoal.objects.filter(user=request.user)
+    blocks = TimeBlock.objects.filter(user=request.user)
+    focus, created = CurrentFocus.objects.get_or_create(
+        user=request.user, 
+        defaults={'title': 'Focus on your top priority', 'type_label': 'DEEP WORK (1H)'}
+    )
     
-    # Ensure all tasks have an ID and status (for drag and drop)
-    changed = False
-    for t in user_tasks:
-        if 'id' not in t:
-            t['id'] = str(uuid.uuid4())
-            changed = True
-        if 'status' not in t:
-            t['status'] = 'todo'
-            changed = True
-        if 'priority' not in t:
-            t['priority'] = 'medium'
-            changed = True
-            
-    if changed:
-        profile.tasks = user_tasks
-        profile.save()
-            
     context = {
-        'tasks': user_tasks,
-        'tasks_json': json.dumps(user_tasks)
+        'goals': goals,
+        'blocks': blocks,
+        'focus': focus
     }
-    return render(request, "tasks.html", context)
+    return render(request, "planner.html", context)
 
 @csrf_exempt
 @login_required
-def update_task_status(request):
+def create_goal(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            task_id = str(data.get('id', ''))
-            new_status = data.get('status')
+            # Find the max order to append at the end
+            max_order_query = DailyGoal.objects.filter(user=request.user).order_by('-order').first()
+            new_order = (max_order_query.order + 1) if max_order_query else 0
             
-            profile = UserProfile.objects.get(user=request.user)
-            user_tasks = list(profile.tasks)
-            for t in user_tasks:
-                if str(t.get('id')) == task_id:
-                    t['status'] = new_status
-                    profile.tasks = user_tasks
-                    profile.save()
-                    return JsonResponse({'success': True})
-            return JsonResponse({'error': 'Task not found'}, status=404)
+            goal = DailyGoal.objects.create(
+                user=request.user,
+                text=data.get('text', 'New Goal'),
+                is_completed=data.get('is_completed', False),
+                is_high_priority=data.get('is_high_priority', False),
+                order=new_order
+            )
+            return JsonResponse({'success': True, 'id': goal.id})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
 @csrf_exempt
 @login_required
-def delete_task(request):
+def update_goal(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            task_id = str(data.get('id', ''))
+            goal_id = data.get('id')
+            goal = DailyGoal.objects.filter(user=request.user, id=goal_id).first()
+            if not goal:
+                return JsonResponse({'error': 'Goal not found'}, status=404)
             
-            profile = UserProfile.objects.get(user=request.user)
-            user_tasks = list(profile.tasks)
-            new_tasks = [t for t in user_tasks if str(t.get('id')) != task_id]
-            if len(new_tasks) < len(user_tasks):
-                profile.tasks = new_tasks
-                profile.save()
-                return JsonResponse({'success': True})
-            return JsonResponse({'error': 'Task not found'}, status=404)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Invalid method'}, status=405)
-
-@csrf_exempt
-@login_required
-def clear_tasks_by_status(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            status = data.get('status')
-            
-            profile = UserProfile.objects.get(user=request.user)
-            user_tasks = list(profile.tasks)
-            new_tasks = [t for t in user_tasks if t.get('status') != status]
-            
-            if len(new_tasks) < len(user_tasks):
-                profile.tasks = new_tasks
-                profile.save()
+            if 'text' in data:
+                goal.text = data['text']
+            if 'is_completed' in data:
+                goal.is_completed = data['is_completed']
+            if 'is_high_priority' in data:
+                goal.is_high_priority = data['is_high_priority']
+            if 'order' in data:
+                goal.order = data['order']
+                
+            goal.save()
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
@@ -101,53 +72,51 @@ def clear_tasks_by_status(request):
 
 @csrf_exempt
 @login_required
-def create_task(request):
+def delete_goal(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            new_task = {
-                'id': str(uuid.uuid4()),
-                'title': data.get('title', 'New Task'),
-                'status': data.get('status', 'todo'),
-                'priority': 'medium',
-                'description': '',
-                'due_date': '',
-                'due_time': ''
-            }
-            profile = UserProfile.objects.get(user=request.user)
-            tasks = list(profile.tasks)
-            tasks.append(new_task)
-            profile.tasks = tasks
-            profile.save()
-            return JsonResponse({'success': True, 'task': new_task})
+            goal_id = data.get('id')
+            DailyGoal.objects.filter(user=request.user, id=goal_id).delete()
+            return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
 @csrf_exempt
 @login_required
-def update_task_title(request):
+def create_timeblock(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            task_id = str(data.get('id', ''))
-            new_title = data.get('title', '').strip()
-            if not new_title:
-                return JsonResponse({'error': 'Empty title'}, status=400)
-                
-            profile = UserProfile.objects.get(user=request.user)
-            user_tasks = list(profile.tasks)
-            for t in user_tasks:
-                if str(t.get('id')) == task_id:
-                    t['title'] = new_title
-                    profile.tasks = user_tasks
-                    profile.save()
-                    return JsonResponse({'success': True})
-            return JsonResponse({'error': 'Task not found'}, status=404)
+            block = TimeBlock.objects.create(
+                user=request.user,
+                start_time_str=data.get('start_time_str', '12:00'),
+                time_period=data.get('time_period', 'PM'),
+                title=data.get('title', 'New Block'),
+                description=data.get('description', ''),
+                color=data.get('color', 'emerald')
+            )
+            return JsonResponse({'success': True, 'id': block.id})
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
+@csrf_exempt
 @login_required
-def planner_view(request):
-    return render(request, "planner.html")
+def update_focus(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            focus, _ = CurrentFocus.objects.get_or_create(user=request.user)
+            if 'title' in data:
+                focus.title = data['title']
+            if 'type_label' in data:
+                focus.type_label = data['type_label']
+            if 'is_completed' in data:
+                focus.is_completed = data['is_completed']
+            focus.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid method'}, status=405)

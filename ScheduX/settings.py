@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     'accounts',
     'assistant',
     'dashboard',
-    'planner',
+    'tasks',
+    'calendar_app',
 ]
 
 TAILWIND_APP_NAME = "tailwind_css"
@@ -84,6 +85,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "accounts.context_processors.sidebar_counts",
             ],
         },
     },
