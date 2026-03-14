@@ -33,7 +33,8 @@ def chat_api(request):
         profile, _ = UserProfile.objects.get_or_create(user=request.user)
         ai_response = ""
 
-         if mode == "": 
+                    
+        if mode == "":
             mode = classify_prompt(text)
 
         if mode == 'Meeting Assistant':
